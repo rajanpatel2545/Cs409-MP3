@@ -24,9 +24,14 @@
   },
   "dependencies": {
     "body-parser": "^1.17.2",
-    "dotenv": "^17.2.3",
-    "express": "^4.15.3",
-    "mongoose": "^5.4.18",
-    "nodemon": "^1.11.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "helmet": "^8.1.0",
+    "mongoose": "^8.19.2",
+    "morgan": "^1.10.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

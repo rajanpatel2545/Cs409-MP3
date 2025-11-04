@@ -1,39 +1,53 @@
-// Get the packages we need
-var express = require('express'),
-    router = express.Router(),
-    mongoose = require('mongoose'),
-    bodyParser = require('body-parser');
+// server.js (root)
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 
-// Read .env file
-require('dotenv').config();
+import usersRouter from './routes/users.js';
+import tasksRouter from './routes/tasks.js';
 
-// Create our Express application
-var app = express();
+dotenv.config();
 
-// Use environment defined port or 3000
-var port = process.env.PORT || 3000;
+const app = express();
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Connect to a MongoDB --> Uncomment this once you have a connection string!!
-//mongoose.connect(process.env.MONGODB_URI,  { useNewUrlParser: true });
+const uri = process.env.MONGODB_URI;
+await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
+console.log('Connected to MongoDB');
 
-// Allow CORS so that backend and frontend could be put on different servers
-var allowCrossDomain = function (req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept");
-    res.header("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE, OPTIONS");
-    next();
-};
-app.use(allowCrossDomain);
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({ message: 'OK', data: { service: 'llama.io', status: 'healthy' } });
+});
 
-// Use the body-parser package in our application
-app.use(bodyParser.urlencoded({
-    extended: true
-}));
-app.use(bodyParser.json());
+app.use('/api/users', usersRouter);
+app.use('/api/tasks', tasksRouter);
 
-// Use routes as a module (see index.js)
-require('./routes')(app, router);
+// 404
+app.use((req, res) => res.status(404).json({ message: 'Not Found', data: null }));
 
-// Start the server
-app.listen(port);
-console.log('Server running on port ' + port);
+app.use((err, _req, res, _next) => {
+  console.error(err);
+
+  if (err?.code === 11000 && err?.keyPattern?.email) {
+    return res.status(400).json({ message: 'A user with that email already exists.', data: null });
+  }
+  if (err?.name === 'ValidationError') {
+    const msg = Object.values(err.errors)[0]?.message || 'Validation error';
+    return res.status(400).json({ message: msg, data: null });
+  }
+  if (err?.name === 'CastError') {
+    return res.status(400).json({ message: 'Invalid identifier', data: null });
+  }
+
+  res.status(500).json({ message: 'Server error', data: null });
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`API listening on :${port}`));
